@@ -49,6 +49,7 @@ per-request as query params (see [Endpoints](#endpoints)).
 | -------------- | ---------------------------------------- | ---------------------------------------------------- |
 | `API_URL`      | Rafay console base URL (no trailing `/`) | `https://console.gruve-ctl.paas.dev.rafay-edge.net`  |
 | `API_KEY`      | Rafay API key (sent as `X-API-KEY`)      | `ra2.xxxxxxxx…`                                      |
+| `LOG_FILE_NAME`| Base name for the log file               | `rafay-api-poc` → logs at `/tmp/rafay-api-poc.log`   |
 
 ---
 
@@ -109,6 +110,30 @@ GET {API_URL}/apis/infra.k8smgmt.io/v3/projects/{project}/clusters/{name}/kubeco
 
 ---
 
+## Logs
+
+Each request/response to Rafay is logged to both the console and a file at
+`/tmp/<LOG_FILE_NAME>.log` (default **`/tmp/rafay-api-poc.log`**). The API key is
+never logged. Tail it with:
+
+```bash
+tail -f /tmp/rafay-api-poc.log
+```
+
+---
+
+## Tests
+
+```bash
+uv run pytest -v
+```
+
+The suite mocks the Rafay call (no network) and includes a test that a successful
+proxy response is a **valid Kubernetes kubeconfig** — it parses as YAML and has
+`apiVersion: v1`, `kind: Config`, and non-empty `clusters`/`contexts`/`users`.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely cause / fix |
@@ -141,6 +166,8 @@ uvicorn app.main:app --reload --port 8099
 .
 ├── app/
 │   └── main.py        # FastAPI proxy (the whole app)
+├── tests/
+│   └── test_main.py   # pytest suite (mocks Rafay; no network)
 ├── .env.example       # config template — copy to .env
 ├── pyproject.toml     # dependencies (managed by uv)
 └── README.md

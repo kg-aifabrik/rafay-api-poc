@@ -11,9 +11,6 @@ from fastapi import FastAPI, HTTPException, Response
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import httpx
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-logger = logging.getLogger("rafay_proxy")
-
 
 class Settings(BaseSettings):
     """Config loaded from the local .env file (see .env.example)."""
@@ -22,9 +19,22 @@ class Settings(BaseSettings):
 
     API_URL: str
     API_KEY: str
+    # Base name for the log file; the file lives at /tmp/<LOG_FILE_NAME>.log
+    LOG_FILE_NAME: str = "rafay-api-poc"
 
 
 settings = Settings()
+
+# Log to both the file (/tmp/<name>.log) and the console (alongside uvicorn).
+LOG_FILE = f"/tmp/{settings.LOG_FILE_NAME}.log"
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    handlers=[logging.FileHandler(LOG_FILE), logging.StreamHandler()],
+)
+logger = logging.getLogger("rafay_proxy")
+logger.info("Logging to %s", LOG_FILE)
+
 app = FastAPI(title="Rafay API proxy (POC)")
 
 # Rafay kubeconfig endpoint template.
