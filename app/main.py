@@ -5,9 +5,14 @@
 # Purpose: expose a single local endpoint that fetches a cluster's
 # kubeconfig YAML from Rafay so callers don't handle the API key directly.
 
+import logging
+
 from fastapi import FastAPI, HTTPException, Response
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import httpx
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+logger = logging.getLogger("rafay_proxy")
 
 
 class Settings(BaseSettings):
@@ -43,12 +48,22 @@ async def kubeconfig(project: str, name: str):
         "X-API-KEY": settings.API_KEY,
     }
 
+    # Log the outbound request. X-API-KEY is omitted on purpose — never log secrets.
+    logger.info("Rafay request: GET %s (accept=%s)", url, headers["accept"])
+
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.get(url, headers=headers)
     except httpx.RequestError as exc:
         # Operational fault reaching Rafay — fail with context, not the key.
+        logger.error("Rafay request failed: GET %s — %s", url, exc)
         raise HTTPException(status_code=502, detail=f"Failed to reach Rafay: {exc}") from exc
+
+    # Log the response: status, size, and body (truncated on error).
+    if resp.status_code == 200:
+        logger.info("Rafay response: %s (%d bytes)", resp.status_code, len(resp.content))
+    else:
+        logger.warning("Rafay response: %s — %s", resp.status_code, resp.text[:500])
 
     if resp.status_code != 200:
         raise HTTPException(
